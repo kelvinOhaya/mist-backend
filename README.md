@@ -1,6 +1,6 @@
-# Chat Application Backend
+# Mist Backend
 
-This is the backend server for a real-time chat application built with Node.js, Express, Socket.IO, and MongoDB.
+This is the backend server for **Mist**, a real-time chat application built with Node.js, Express, Socket.IO, and MongoDB.
 
 ## Features
 
@@ -15,7 +15,7 @@ This is the backend server for a real-time chat application built with Node.js, 
 
 ## Project Structure
 
-```plaintext
+```
 backend/
 ├── config/             # Configuration files
 ├── controllers/        # Request handlers
