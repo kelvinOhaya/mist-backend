@@ -5,17 +5,27 @@ const utils = require("../utils/utils");
 
 //updates the user's profile picture
 exports.updateProfilePicture = async (req, res) => {
-  const senderId = req.user.id;
-  const imageUrl = req.file.path;
-  const public_Id = req.file.filename;
-
   try {
+    const senderId = req.user.id;
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No image file was uploaded" });
+    }
+
+    const imageUrl = req.file.secure_url || req.file.url || req.file.path;
+    const public_Id = req.file.filename || req.file.public_id;
+
     const foundUser = await User.findById(senderId).select(
-      "profilePicture members"
+      "profilePicture members",
     );
     //console.log("Current User: ", foundUser, "\nImage Url: ", imageUrl);
     if (foundUser.profilePicture != null) {
-      await cloudinary.uploader.destroy(foundUser.profilePicture.public_Id);
+      const existingPublicId =
+        foundUser.profilePicture.public_Id ||
+        foundUser.profilePicture.public_id;
+      if (existingPublicId) {
+        await cloudinary.uploader.destroy(existingPublicId);
+      }
     }
 
     const newProfilePicture = { url: imageUrl, public_Id }; //now profile picture object
@@ -32,8 +42,6 @@ exports.updateProfilePicture = async (req, res) => {
       ...new Set(possibleMembers.flatMap((room) => room.members)),
     ];
 
-    res.status(200).json({ newProfilePicture });
-
     await Promise.all([
       User.findByIdAndUpdate(req.user.id, {
         profilePicture: newProfilePicture,
@@ -42,35 +50,44 @@ exports.updateProfilePicture = async (req, res) => {
         //cheating a little by setting the argument to members rather than having the whole chat object
         { members: uniqueMembers },
         "update-profile-picture",
-        { foundUserId: senderId, newProfilePicture }
+        { foundUserId: senderId, newProfilePicture },
       ),
     ]);
+
+    return res.status(200).json({ newProfilePicture });
   } catch (error) {
     console.log("Failed to upload image to cloudinary: ", error);
-    return res
-      .status(500)
-      .json({ error: "Failed to upload image to cloudinary" });
+    return res.status(500).json({ error: error?.message || String(error) });
   }
 };
 
 //for updating group chat photos
 exports.updateGroupProfilePicture = async (req, res) => {
-  const { roomId } = req.body;
-  const imageUrl = req.file.path;
-
   try {
+    const { roomId } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No image file was uploaded" });
+    }
+
+    const imageUrl = req.file.secure_url || req.file.url || req.file.path;
+
     //find the chat room, and if there is an existing profile picture, destroy that in cloudinary
     const foundChatRoom = await ChatRoom.findById(roomId).select(
-      "profilePicture members"
+      "profilePicture members",
     );
     if (foundChatRoom.profilePicture != null) {
-      await cloudinary.uploader.destroy(foundChatRoom.profilePicture.public_Id);
+      const existingPublicId =
+        foundChatRoom.profilePicture.public_Id ||
+        foundChatRoom.profilePicture.public_id;
+      if (existingPublicId) {
+        await cloudinary.uploader.destroy(existingPublicId);
+      }
     }
-    res.sendStatus(200);
     //new image url
     const newProfilePicture = {
       url: imageUrl,
-      public_Id: req.file.filename,
+      public_Id: req.file.filename || req.file.public_id,
     };
 
     //find the corresponding onlineIds
@@ -86,8 +103,10 @@ exports.updateGroupProfilePicture = async (req, res) => {
         newProfilePicture,
       }),
     ]);
+
+    return res.status(200).json({ newProfilePicture });
   } catch (error) {
     console.log("Failed to upload the group Profile to cloudinary: ", error);
-    return res.status(500).json({ error });
+    return res.status(500).json({ error: error?.message || String(error) });
   }
 };

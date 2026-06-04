@@ -3,63 +3,59 @@ const User = require("../models/User"); //import the user model
 const { createAccessToken, createRefreshToken } = require("../utils/jwt"); //import the functions for making access and refresh tokens
 const { generateJoinCode } = require("../utils/utils");
 const { ObjectId } = require("mongodb");
-require("dotenv").config();
+const { REFRESH_SECRET } = require("../config/env");
 
 //regex function to remove accidental spaces
 const removeAccidentalSpaces = (str) => str.replace(/\s+/g, " ").trim();
 
-//controller for verifying the sign up input
-exports.verifySignUp = async (req, res) => {
-  //destructured names (same as saying "username = req.body.username" etc...)
+//checks for things the frontend cannot such as emails already existing
+exports.checkIfUsernameExists = async (req, res) => {
   const { username, password, confirmedPassword } = req.body;
-
-  /*
-    Checks that:
-        - the fields aren't empty
-        - the passwords match
-        - the username isn't already taken
-    */
-  const newErrors = {
-    fieldsAreEmpty:
-      username === "" || password === "" || confirmedPassword === "",
-    passwordsDoNotMatch: password != confirmedPassword,
-    passwordUnderEightCharacters: password.length < 8,
-    usernameIsAlreadyTaken: (await User.findOne({ username })) != null,
-  };
-
+  const result = await User.findOne({ username });
+  const usernameExists = result ? true : false;
   //send any errors found to the client as an object
-  res.json({ newErrors });
+  res.json({ usernameExists });
 };
 
 //sign up logic
 exports.signUp = async (req, res) => {
   const { username, password } = req.body;
-  const joinCode = await generateJoinCode(8);
+  try {
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+      return res.status(409).json({ error: "username already exists" });
+    }
 
-  //make a new user with the request from the user
-  const newUser = new User({
-    username, // <- a shortcut that means "username: username"
-    currentChat: new ObjectId("68c0671711b70a88b9b0cd90"),
-    password,
-    joinCode, // same as the line above
-  });
+    const joinCode = await generateJoinCode(8);
 
-  await newUser.save(); //save the user to mongoDB
+    //make a new user with the request from the user
+    const newUser = new User({
+      username, // <- a shortcut that means "username: username"
+      currentChat: new ObjectId("68c0671711b70a88b9b0cd90"),
+      password,
+      joinCode, // same as the line above
+    });
 
-  //grant access and refresh tokens (check jwt.js for details)
-  const accessToken = createAccessToken(newUser);
-  const refreshToken = createRefreshToken(newUser);
+    await newUser.save(); //save the user to mongoDB
 
-  const foundUser = await User.findOne({ username }).select("");
-  await ChatRoom.findByIdAndUpdate("68c0671711b70a88b9b0cd90", {
-    $addToSet: { members: foundUser._id },
-  });
+    //grant access and refresh tokens (check jwt.js for details)
+    const accessToken = createAccessToken(newUser);
+    const refreshToken = createRefreshToken(newUser);
 
-  //send both tokens to the client
-  return res.status(200).json({
-    accessToken: accessToken,
-    refreshToken: refreshToken,
-  });
+    const foundUser = await User.findOne({ username }).select("");
+    await ChatRoom.findByIdAndUpdate("68c0671711b70a88b9b0cd90", {
+      $addToSet: { members: foundUser._id },
+    });
+
+    //send both tokens to the client
+    return res.status(200).json({
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    });
+  } catch (error) {
+    console.log(`SIGNUP::ERROR:: ${error}`);
+    return res.status(500).json({ error: "Server error" });
+  }
 };
 
 //login logic
@@ -110,9 +106,9 @@ exports.refreshToken = (req, res) => {
   }
 
   //verify the refresh token, and sent the user a new access token if it is valid. Otherwise send a 403 status error telling the user they are unauthorized
-  jwt.verify(token, process.env.REFRESH_SECRET, (error, user) => {
+  jwt.verify(token, REFRESH_SECRET, (error, user) => {
     if (error) {
-      return res.sendStatus(403);
+      return res.sendStatus(401);
     }
     const accessToken = createAccessToken({ _id: user.id });
     const newRefreshToken = createRefreshToken({ _id: user.id });

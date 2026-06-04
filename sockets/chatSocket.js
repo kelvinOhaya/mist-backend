@@ -21,7 +21,7 @@ function initSocket(io) {
       await OnlineId.findOneAndUpdate(
         { userId: socket.userId },
         { socketId: socket.id },
-        { upsert: true, new: true }
+        { upsert: true, new: true },
       );
 
       // Rejoin rooms on reconnection
@@ -59,6 +59,7 @@ function initSocket(io) {
     socket.on("send-message", async (message) => {
       console.log(message);
       const newMessage = new Message({
+        type: "message",
         sender: message.sender._id,
         chatRoom: message.chatRoomId,
         content: message.content,

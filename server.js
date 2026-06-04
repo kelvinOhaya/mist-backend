@@ -7,17 +7,23 @@ const chatRoomRoutes = require("./routes/chatRoomRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const cookieParser = require("cookie-parser");
 const connectDB = require("./config/db");
-require("dotenv").config();
 const { Server } = require("socket.io");
-const port = process.env.PORT || 5000;
+const {
+  PORT,
+  FRONTEND_URL,
+  FRONTEND_NETWORK_URL,
+  FRONTEND_PORT,
+} = require("./config/env");
 const path = require("path");
 const { init } = require("./io");
 const initSocket = require("./sockets/chatSocket");
+
+const port = PORT || 5000;
 const allowedOrigins = [
-  `http://localhost:${process.env.FRONTEND_PORT}`,
-  process.env.FRONTEND_URL,
-  process.env.FRONTEND_NETWORK_URL,
-];
+  `http://localhost:${FRONTEND_PORT}`,
+  FRONTEND_URL,
+  FRONTEND_NETWORK_URL,
+].filter(Boolean);
 
 //connect to mongodb (consult db.js)
 connectDB();
@@ -35,12 +41,16 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(
   cors({
-    credentials: true, //allows us to use cookies in our requests
-    origin: true, // Allow all origins for development/mobile testing
-    //allow the frontend to make requests to this server
+    credentials: true, // allows us to use cookies in our requests
+    origin: (origin, callback) => {
+      // allow non-browser requests like curl/postman (no origin)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("CORS policy: origin not allowed"));
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-  })
+  }),
 );
 //initialize socketio's logic
 
@@ -48,6 +58,22 @@ app.use(
 app.use("/api/auth", authRoutes);
 app.use("/api/chatroom", chatRoomRoutes);
 app.use("/api/upload", uploadRoutes);
+
+// Generic error handler (returns JSON and logs stack)
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  if (res.headersSent) return next(err);
+  const status = err.status || 500;
+  res.status(status).json({ error: err.message || "Internal Server Error" });
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection at:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+});
 
 //listen on this port, and do the following function once listening.
 server.listen(port, "0.0.0.0", () => {

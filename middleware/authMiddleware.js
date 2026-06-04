@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { ACCESS_SECRET} = require("../config/env")
 
 //the middleware for authentication routes that should check that the user has an accessToken before accessing the route
 const authMiddleware = (req, res, next) => {
@@ -15,7 +16,7 @@ const authMiddleware = (req, res, next) => {
 
   //get the decoded jwt token and set the req.user property of the route to the decoded token. then continue to the route originally intended
   try {
-    const decoded = jwt.verify(token, process.env.ACCESS_SECRET);
+    const decoded = jwt.verify(token, ACCESS_SECRET);
     req.user = decoded;
     next();
   } catch (err) {

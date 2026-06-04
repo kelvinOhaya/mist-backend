@@ -5,11 +5,12 @@ const User = require("./User");
 
 const messageSchema = new Schema(
   {
+    type: { type: String, required: true },
     sender: { type: Schema.Types.ObjectId, ref: "User", required: true },
     chatRoom: { type: Schema.Types.ObjectId, ref: "ChatRoom", required: true },
     content: { type: String, required: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Message", messageSchema);

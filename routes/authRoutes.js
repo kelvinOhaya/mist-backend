@@ -4,7 +4,7 @@ const authController = require("../controllers/authController");
 const authMiddleware = require("../middleware/authMiddleware");
 
 //what type of request should be accepted for each route
-router.post("/verify-signup", authController.verifySignUp);
+router.post("/verify-signup", authController.checkIfUsernameExists);
 router.post("/signup", authController.signUp);
 router.post("/login", authController.login);
 router.post("/refresh-token", authController.refreshToken);

@@ -38,21 +38,17 @@ exports.joinRoom = async (req, res) => {
   const foundRoom = await ChatRoom.findOneAndUpdate(
     { joinCode }, //find the field based on the joinCode
     { $addToSet: { members: senderId } }, //add the senderId to members[]
-    { new: true } //return the updated document
+    { new: true }, //return the updated document
   ).lean();
 
-  if (!foundRoom) {
-    res.status(400).json({ error: "incorrect join code" });
-  }
-
   foundRoom.memberCount = foundRoom.members.length;
-  console.log(
-    `We found the following room when joining a group chat: \n${JSON.stringify(
-      foundRoom
-    )}`
-  );
+  // console.log(
+  //   `We found the following room when joining a group chat: \n${JSON.stringify(
+  //     foundRoom,
+  //   )}`,
+  // );
 
-  //find all onlineIds that are in the member's array fo foundRoom's members
+  //find all onlineIds that are in the member's array for foundRoom's members
   const foundOnlineIds = await OnlineId.find({
     //since you used .lean()the members need to be converted back to Ids from strings
     userId: {
@@ -149,7 +145,7 @@ exports.findUser = async (req, res) => {
       {
         $pull: { exMembers: senderId },
         $addToSet: { members: senderId },
-      }
+      },
     );
   } catch (error) {
     roomToUpdate = null;
@@ -181,7 +177,7 @@ exports.findUser = async (req, res) => {
             ],
           },
         ],
-      })
+      }),
     );
 
     console.log("Here is the found room:\n", foundRoom); //check if the client room exists or not
@@ -216,8 +212,8 @@ exports.findUser = async (req, res) => {
     const foundDm = await ChatRoom.aggregate(
       getDmPipeline(
         senderId,
-        { joinCode: newJoinCode } //find the room with the matching joincode)
-      )
+        { joinCode: newJoinCode }, //find the room with the matching joincode)
+      ),
     );
 
     // console.log(`Found the following DM: ${foundDm}`); //--check if the dm exists
@@ -226,12 +222,12 @@ exports.findUser = async (req, res) => {
     const alteredFoundDm = {
       ...foundDm[0],
       otherUser: foundDm[0].members.find(
-        (member) => member._id.toString() === senderId.toString()
+        (member) => member._id.toString() === senderId.toString(),
       ),
     };
 
     console.log(
-      `Here's your altered DM: ${JSON.stringify(alteredFoundDm, null, 2)}`
+      `Here's your altered DM: ${JSON.stringify(alteredFoundDm, null, 2)}`,
     ); //--shows the altered DM
 
     //send the socketEvent "add-room"
@@ -304,25 +300,23 @@ exports.sendInfo = async (req, res) => {
       if (room.isDm === true) {
         if (room.members.length > 1) {
           room.otherUser = room.members.find(
-            (user) => user.username != foundUser.username
+            (user) => user.username != foundUser.username,
           );
         } else {
           room.otherUser = room.exMembers.find(
-            (user) => user.username != foundUser.username
+            (user) => user.username != foundUser.username,
           );
         }
         if (!room.otherUser) {
           console.log("No other user could be found");
         }
       }
-      delete room.members;
     });
 
-    //MAKE IT SO THAT USERS CANT FIND A USER TWICE!!! SAME FOR GROUP CHATS
     const currentChat =
-      filteredChatRooms.find(
-        (room) => room._id.toString() === foundUser.currentChat?.toString()
-      ) || null;
+      filteredChatRooms.filter(
+        (room) => room._id.toString() === foundUser.currentChat?.toString(),
+      )[0] || null;
 
     !currentChat && console.log("No current chat found");
 
@@ -352,8 +346,9 @@ exports.verifyJoinCode = async (req, res) => {
   const { joinCode } = req.body;
 
   const foundRoom = await ChatRoom.findOne({ joinCode });
+  const foundUser = await User.findOne({ joinCode });
 
-  return res.json({ isValid: foundRoom !== null });
+  return res.json({ isValid: foundRoom !== null || foundUser !== null });
 };
 
 exports.changeName = async (req, res) => {
@@ -365,7 +360,7 @@ exports.changeName = async (req, res) => {
         _id: currentRoomId,
       },
       { $set: { name: newName } },
-      { new: true }
+      { new: true },
     ).select("members");
 
     console.log(`Update results: \n${JSON.stringify(foundChatRoom, null, 2)}`);
@@ -375,7 +370,7 @@ exports.changeName = async (req, res) => {
     });
 
     console.log(
-      `All reported onlineIds:\n ${JSON.stringify(foundOnlineIds, null, 2)}`
+      `All reported onlineIds:\n ${JSON.stringify(foundOnlineIds, null, 2)}`,
     );
 
     foundOnlineIds.forEach((onlineId) => {
@@ -399,7 +394,7 @@ exports.updateCurrentRoom = async (req, res) => {
     await User.findByIdAndUpdate(
       userId,
       { currentChat: currentRoomId },
-      { new: true }
+      { new: true },
     );
     getIo().to(socketId).emit("print-success");
     return res.sendStatus(200);
@@ -408,21 +403,23 @@ exports.updateCurrentRoom = async (req, res) => {
   }
 };
 
-//delete chat room
+/** Function for deleting the chat room */
 exports.leaveRoom = async (req, res) => {
   const senderId = req.user.id;
   const { currentRoomId } = req.body;
   console.log(`Current Room Id: ${currentRoomId}`);
 
   try {
-    //find the chatroom to delete by id
-    const foundChatRoom = await ChatRoom.findById(currentRoomId);
+    const [foundChatRoom, foundUser] = await Promise.all([
+      ChatRoom.findById(currentRoomId),
+      await User.findById(senderId),
+    ]);
     if (!foundChatRoom) {
-      return res.status(404).json({ error: "Chat room not found" });
+      throw new Error("The chatroom with the given Id could not be found");
     }
-    // if (!Array.isArray(foundChatRoom.members)) {
-    //   foundChatRoom.members = [];
-    // }
+    if (!foundUser) {
+      throw new Error("The user with the sender's Id couldn't be found");
+    }
 
     //if there is only one member at the time of the leave request, delete the room and its corresponding messages entirely
     if (foundChatRoom.members.length === 1) {
@@ -435,26 +432,32 @@ exports.leaveRoom = async (req, res) => {
         //remove the id from members, and add it to exMembers
         ChatRoom.updateOne(
           { _id: currentRoomId },
-          { $pull: { members: senderId }, $addToSet: { exMembers: senderId } }
+          { $pull: { members: senderId }, $addToSet: { exMembers: senderId } },
         ),
         //set the currentChat to null
         User.updateOne({ _id: senderId }, { $set: { currentChat: null } }),
       ]);
       console.log("Successfully removed!");
 
-      //question: how do we find all the socketIds of the people who are online AND in the room the user just left?
-      //idea: find all the onlineIds and filter them down to the ones that are in the members array of the chatRoom
       const foundOnlineIds = await OnlineId.find({
         userId: {
           $in: foundChatRoom.members.filter((id) => id.toString() !== senderId),
         }, //check if userId is in foundChatRoom.members array
       });
+      const leftMsg = new Message({
+        type: "notification",
+        sender: senderId,
+        chatRoom: foundChatRoom._id,
+        content: `${foundUser.username} has left`,
+      });
 
       if (foundOnlineIds) {
         foundOnlineIds.forEach((onlineId) => {
-          getIo()
-            .to(onlineId.socketId)
-            .emit("decrease-member-count", { roomId: currentRoomId });
+          getIo().to(onlineId.socketId).emit("decrease-member-count", {
+            roomId: currentRoomId,
+            memberId: senderId,
+            msg: leftMsg,
+          });
         });
       }
     }
