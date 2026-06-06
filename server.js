@@ -13,6 +13,7 @@ const {
   FRONTEND_URL,
   FRONTEND_NETWORK_URL,
   FRONTEND_PORT,
+  MOBILE_TESTING_URL,
 } = require("./config/env");
 const path = require("path");
 const { init } = require("./io");
@@ -23,6 +24,7 @@ const allowedOrigins = [
   `http://localhost:${FRONTEND_PORT}`,
   FRONTEND_URL,
   FRONTEND_NETWORK_URL,
+  MOBILE_TESTING_URL,
 ].filter(Boolean);
 
 //connect to mongodb (consult db.js)

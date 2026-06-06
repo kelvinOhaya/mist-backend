@@ -10,6 +10,7 @@ const envSchema = z.object({
   CLOUDINARY_API_SECRET: z.string().optional(),
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
   FRONTEND_URL: z.string().url().optional(),
+  MOBILE_TESTING_URL: z.string().url(),
   FRONTEND_NETWORK_URL: z.string().url().optional(),
   FRONTEND_PORT: z.coerce.number().int().positive().default(5173),
   PORT: z.coerce.number().int().positive().default(5000),
@@ -51,4 +52,5 @@ module.exports = {
   FRONTEND_NETWORK_URL: env.FRONTEND_NETWORK_URL || null,
   FRONTEND_PORT: env.FRONTEND_PORT,
   PORT: env.PORT,
+  MOBILE_TESTING_URL: env.MOBILE_TESTING_URL,
 };
