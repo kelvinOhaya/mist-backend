@@ -66,8 +66,6 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: err.message || "Internal Server Error" });
 });
 
-app.options("*", cors(corsOptions));
-
 process.on("unhandledRejection", (reason) => {
   console.error("Unhandled Rejection at:", reason);
 });
