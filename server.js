@@ -41,12 +41,22 @@ const corsOptions = {
     // allow non-browser requests like curl/postman (no origin)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
+    console.log(origin);
+    console.log(allowedOrigins);
+
+    console.log(
+      allowedOrigins.map((o) => ({
+        value: o,
+        match: o === origin,
+      })),
+    );
     return callback(new Error(`CORS policy: origin ${origin} not allowed`));
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 initSocket(io);
+console.log(`Allowed: "${FRONTEND_NETWORK_URL}"`);
 
 //allows use for json, parsing cookies, and cors
 app.use(express.json());
