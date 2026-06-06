@@ -40,7 +40,7 @@ const corsOptions = {
     // allow non-browser requests like curl/postman (no origin)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error("CORS policy: origin not allowed"));
+    return callback(new Error(`CORS policy: origin ${origin} not allowed`));
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
