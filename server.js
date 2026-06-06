@@ -30,6 +30,7 @@ connectDB();
 
 //make an express instance
 const app = express();
+app.set("trust proxy", 1);
 
 //connect to socket.io
 const server = http.createServer(app);
