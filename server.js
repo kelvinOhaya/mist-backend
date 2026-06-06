@@ -34,24 +34,23 @@ const app = express();
 //connect to socket.io
 const server = http.createServer(app);
 const io = init(server, allowedOrigins);
+const corsOptions = {
+  credentials: true, // allows us to use cookies in our requests
+  origin: (origin, callback) => {
+    // allow non-browser requests like curl/postman (no origin)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error("CORS policy: origin not allowed"));
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 initSocket(io);
 
 //allows use for json, parsing cookies, and cors
 app.use(express.json());
 app.use(cookieParser());
-app.use(
-  cors({
-    credentials: true, // allows us to use cookies in our requests
-    origin: (origin, callback) => {
-      // allow non-browser requests like curl/postman (no origin)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error("CORS policy: origin not allowed"));
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  }),
-);
+app.use(cors(corsOptions));
 //initialize socketio's logic
 
 //mount all the routers
@@ -66,6 +65,8 @@ app.use((err, req, res, next) => {
   const status = err.status || 500;
   res.status(status).json({ error: err.message || "Internal Server Error" });
 });
+
+app.options("*", cors(corsOptions));
 
 process.on("unhandledRejection", (reason) => {
   console.error("Unhandled Rejection at:", reason);
